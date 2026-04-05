@@ -1,139 +1,32 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <title>PLAY SPOT - 실시간 전산 편집기 (AI 연동)</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        body { background-color: #0f172a; color: white; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
-        .editor-container { flex: 1; min-height: 0; }
-        iframe { background: white; width: 100%; height: 100%; border: none; border-radius: 8px; }
-        /* 에디터 느낌을 주는 텍스트 박스 설정 */
-        textarea { 
-            font-family: 'Cascadia Code', 'Courier New', monospace; 
-            background: #1e293b; 
-            color: #f8fafc; 
-            resize: none;
-            white-space: pre;
-            overflow-wrap: normal;
-            overflow-x: auto;
-        }
-        /* 스크롤바 커스텀 */
-        textarea::-webkit-scrollbar { width: 8px; height: 8px; }
-        textarea::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
-    </style>
-</head>
-<body class="p-4 space-y-4">
+<script>
+async function askAI() {
+    const prompt = document.getElementById('aiInstruction').value;
+    const currentCode = editor.value;
+    const btn = document.getElementById('aiBtn');
 
-    <header class="flex justify-between items-center bg-blue-900 px-6 py-3 rounded-lg shadow-2xl border-b-2 border-blue-700">
-        <div class="flex items-center space-x-4">
-            <h1 class="font-black text-2xl tracking-tighter text-white">PLAY SPOT <span class="text-blue-400">CORE</span></h1>
-            <span class="bg-blue-700 px-2 py-1 rounded text-xs font-mono text-blue-200 uppercase tracking-widest">Live Editor v2.0</span>
-        </div>
-        <div class="flex space-x-3">
-            <button onclick="clearEditor()" class="text-gray-300 hover:text-white text-sm font-bold px-3">전체삭제</button>
-            <button onclick="copyForAI()" class="bg-emerald-500 hover:bg-emerald-600 px-6 py-2 rounded-full font-bold shadow-lg transform active:scale-95 transition-all">
-                🚀 AI용 프롬프트 추출 (복사)
-            </button>
-        </div>
-    </header>
+    btn.innerText = "AI가 전산 수정 중... (1070 가동)";
+    btn.disabled = true;
 
-    <div class="grid grid-cols-2 gap-6 editor-container">
-        <div class="flex flex-col space-y-2">
-            <div class="flex justify-between items-center">
-                <label class="text-xs text-blue-400 font-black uppercase tracking-widest">Source Code (Edit Here)</label>
-                <span id="charCount" class="text-[10px] text-gray-500 font-mono">0 chars</span>
-            </div>
-            <textarea id="codeEditor" 
-                spellcheck="false"
-                class="flex-grow p-5 border border-slate-700 rounded-xl outline-none focus:ring-4 focus:ring-blue-500/30 transition-all text-sm leading-relaxed" 
-                placeholder=""></textarea>
-        </div>
-
-        <div class="flex flex-col space-y-2">
-            <label class="text-xs text-emerald-400 font-black uppercase tracking-widest">Real-time Preview</label>
-            <div class="flex-grow shadow-2xl rounded-xl overflow-hidden border border-slate-700">
-                <iframe id="previewFrame" title="preview"></iframe>
-            </div>
-        </div>
-    </div>
-
-    <footer class="bg-slate-800 p-5 rounded-2xl border border-slate-700 shadow-inner">
-        <div class="flex flex-col space-y-3">
-            <div class="flex justify-between items-center">
-                <label class="text-sm font-bold text-slate-300 flex items-center">
-                    <span class="w-2 h-2 bg-blue-500 rounded-full mr-2 animate-pulse"></span>
-                    AI에게 시킬 구체적인 수정 사항
-                </label>
-                <span class="text-[10px] text-slate-500 font-bold uppercase italic">"전체 소스 코드 제공" 규칙 강제 적용됨</span>
-            </div>
-            <div class="flex space-x-4">
-                <input type="text" id="aiInstruction" 
-                    class="flex-grow bg-slate-950 border border-slate-700 p-4 rounded-xl text-sm outline-none focus:border-blue-500 text-blue-100 placeholder-slate-600 shadow-inner" 
-                    placeholder="예: 거래처 등록 팝업창 디자인을 좀 더 전문적으로 바꿔줘. / 상단바 우측에 '관리자' 이름 표시 추가해줘.">
-            </div>
-        </div>
-    </footer>
-
-    <script>
-        const editor = document.getElementById('codeEditor');
-        const frame = document.getElementById('previewFrame');
-        const charCount = document.getElementById('charCount');
-
-        // 1. 실시간 반영 로직 (타이핑하는 즉시 실행)
-        function updatePreview() {
-            const code = editor.value;
-            const doc = frame.contentDocument || frame.contentWindow.document;
-            doc.open();
-            doc.write(code);
-            doc.close();
-            charCount.innerText = code.length.toLocaleString() + " chars";
-        }
-
-        // 2. AI용 최종 프롬프트 생성 (사용자님의 핵심 규칙 삽입)
-        function copyForAI() {
-            const currentCode = editor.value;
-            const instruction = document.getElementById('aiInstruction').value;
-
-            if(!currentCode) { alert("먼저 코드를 입력(붙여넣기) 해주세요!"); return; }
-            if(!instruction) { alert("AI에게 무엇을 시킬지 내용을 적어주세요!"); return; }
-
-            const finalPrompt = `
-### ROLE & STRICT RULES ###
-- 너는 정밀한 ERP 전산 개발 전문가다.
-- 사용자가 제공하는 아래의 소스 코드를 바탕으로 작업해라.
-- [경고] 코드는 절대 임의로 생략하거나 "이전과 동일" 등으로 요약하지 마라.
-- 수정 사항만 반영하되, 반드시 HTML/CSS/JS가 포함된 '전체 소스 코드'를 처음부터 끝까지 출력해라.
-
-### CURRENT SOURCE CODE ###
-${currentCode}
-
-### USER REQUIREMENTS ###
-"${instruction}"
-
-위의 코드를 정확히 분석하고 요청 사항을 반영한 최종 '전체 소스 코드'를 작성해줘.
-            `.trim();
-
-            navigator.clipboard.writeText(finalPrompt).then(() => {
-                alert("🚀 프롬프트 복사 완료!\n\n제미나이나 로컬 AI(Ollama) 채팅창에 Ctrl+V 하세요.");
-            });
-        }
-
-        function clearEditor() {
-            if(confirm("작성 중인 코드를 모두 지울까요?")) {
-                editor.value = "";
-                updatePreview();
-            }
-        }
-
-        // 이벤트 리스너: 입력 시 실시간 업데이트
-        editor.addEventListener('input', updatePreview);
-
-        // 초기 화면 설정 (샘플 예시)
-        window.onload = () => {
-            editor.value = "\n<h1 style='color:navy; text-align:center; margin-top:50px;'>PLAY SPOT 전산 코드를 붙여넣으면<br>여기에 실시간으로 나타납니다.</h1>";
-            updatePreview();
-        }
-    </script>
-</body>
-</html>
+    try {
+        const response = await fetch('http://localhost:11434/api/generate', {
+            method: 'POST',
+            body: JSON.stringify({
+                model: "qwen2.5-coder:7b", // 설치하신 모델명
+                prompt: `너는 ERP 설계 전문가야. 다음 코드를 요약하지 말고 전체를 수정해서 줘. 요청: ${prompt}\n\n코드:\n${currentCode}`,
+                stream: false
+            })
+        });
+        const data = await response.json();
+        
+        // AI가 준 결과물에서 코드 부분만 추출하여 에디터에 자동 삽입
+        const newCode = data.response.match(/<html[\s\S]*<\/html>/i)?.[0] || data.response;
+        editor.value = newCode; 
+        updatePreview(); // 미리보기 자동 갱신
+    } catch (e) {
+        alert("Ollama가 켜져 있는지 확인해주세요!");
+    } finally {
+        btn.innerText = "실시간 수정 요청";
+        btn.disabled = false;
+    }
+}
+</script>
